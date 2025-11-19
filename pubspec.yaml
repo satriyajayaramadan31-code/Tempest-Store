@@ -29,21 +29,18 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   cupertino_icons: ^1.0.8
+  data_table_2: ^2.7.1
+  fl_chart: ^1.1.1
   flutter:
     sdk: flutter
-  provider: ^6.0.5
-  path_provider: ^2.0.11
-  supabase_flutter: ^2.10.3
-  fl_chart: ^1.1.1
+  http: ^1.6.0
   intl: ^0.18.1
-
+  path_provider: ^2.0.11
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  provider: ^6.0.5
+  supabase_flutter: ^2.10.3
 dev_dependencies:
-
-  # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
-  # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
