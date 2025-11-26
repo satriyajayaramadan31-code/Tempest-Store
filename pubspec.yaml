@@ -30,6 +30,8 @@ environment:
 dependencies:
   cupertino_icons: ^1.0.8
   data_table_2: ^2.7.1
+  dropdown_button2: ^2.3.9
+  file_picker: ^10.3.7
   fl_chart: ^1.1.1
   flutter:
     sdk: flutter

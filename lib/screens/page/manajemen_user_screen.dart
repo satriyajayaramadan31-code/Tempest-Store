@@ -269,6 +269,10 @@ class _ManajemenUserScreenState extends State<ManajemenUserScreen> {
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(50),
+                                      side: const BorderSide(
+                                        color: Color(0xFF3A71A4),
+                                        width: 1,
+                                      ),                               
                                     ),
                                   ),
                                 ),

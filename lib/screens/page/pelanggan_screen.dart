@@ -1,6 +1,10 @@
-import 'dart:math' as math;
+// lib/screens/page/pelanggan_screen.dart
 import 'package:flutter/material.dart';
 import 'package:tempest_store/widgets/app_shell.dart';
+import 'package:tempest_store/widgets/add_customer.dart';
+import 'package:tempest_store/widgets/edit_customer.dart';
+import 'package:tempest_store/screens/page/buy_history.dart';
+import 'package:tempest_store/services/supabase_service.dart';
 
 class PelangganScreen extends StatefulWidget {
   const PelangganScreen({super.key});
@@ -16,24 +20,85 @@ class _PelangganScreenState extends State<PelangganScreen> {
   static const double horizontalPadding = 12.0;
 
   String query = '';
+  List<Map<String, dynamic>> customers = [];
+  bool isLoading = true;
 
-  final List<Map<String, String>> customers = List.generate(20, (i) {
-    return {
-      'name': 'Adi setya pratama',
-      'email': 'jadiapa2254@gmail.com',
-      'phone': '082255423325',
-      'address': 'Jl. Jadi Santoso RT 2. RW 12',
-      'total': '10 Transaksi',
-      'joined': '05/10/2023',
-    };
-  });
+  @override
+  void initState() {
+    super.initState();
+    fetchCustomers();
+  }
+
+  Future<void> fetchCustomers() async {
+    setState(() => isLoading = true);
+    try {
+      final service = SupabaseService();
+      final pelangganList = await service.getPelanggan();
+
+      final res = await SupabaseService.client
+          .from('kasir_penjualan')
+          .select('pelangganid');
+      final penjualanData = res as List<dynamic>? ?? [];
+
+      final Map<int, int> totalTransaksiMap = {};
+      for (var p in penjualanData) {
+        final id = p['pelangganid'] as int?;
+        if (id == null) continue;
+        totalTransaksiMap[id] = (totalTransaksiMap[id] ?? 0) + 1;
+      }
+
+      final merged = pelangganList.map((c) {
+        final id = c['pelangganid'] as int?;
+        return {
+          'namapelanggan': c['namapelanggan']?.toString() ?? '-',
+          'email': c['email']?.toString() ?? '-',
+          'alamat': c['alamat']?.toString() ?? '-',
+          'nomortelepon': c['nomortelepon']?.toString() ?? '-',
+          'created_at': c['created_at']?.toString() ?? '-',
+          'totalTransaksi': id != null ? (totalTransaksiMap[id] ?? 0) : 0,
+          'pelangganid': id,
+        };
+      }).toList();
+
+      setState(() => customers = merged);
+    } catch (e) {
+      debugPrint('Error fetching pelanggan: $e');
+    }
+    setState(() => isLoading = false);
+  }
+
+  void _showAddCustomerDialog() async {
+    await showDialog(
+      context: context,
+      builder: (_) => const AddCustomerDialog(),
+    );
+    await fetchCustomers();
+  }
+
+  void _showEditCustomerDialog(Map<String, dynamic> customer) async {
+    await showDialog(
+      context: context,
+      builder: (_) => EditCustomerDialog(customer: customer),
+    );
+    await fetchCustomers();
+  }
+
+  void _openBuyHistory(int? pelangganId) {
+    if (pelangganId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BuyHistoryScreen(pelangganId: pelangganId),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final filtered = customers.where((c) {
       final q = query.toLowerCase();
       if (q.isEmpty) return true;
-      return c.values.any((v) => v.toLowerCase().contains(q));
+      return c.values.any((v) => v.toString().toLowerCase().contains(q));
     }).toList();
 
     return AppShell(
@@ -54,10 +119,9 @@ class _PelangganScreenState extends State<PelangganScreen> {
                 const SizedBox(height: 12),
                 _buildSearchBox(),
                 const SizedBox(height: 12),
-                // Expanded agar scroll vertical untuk list
-                Expanded(
-                  child: _buildCustomerList(filtered),
-                ),
+                isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildCustomerList(filtered),
               ],
             ),
           ),
@@ -70,11 +134,15 @@ class _PelangganScreenState extends State<PelangganScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Manajemen Pelanggan',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black)),
+        const Text(
+          'Manajemen Pelanggan',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black),
+        ),
         const SizedBox(height: 4),
-        Text('Total ada $total pelanggan',
-            style: const TextStyle(fontSize: 13, color: borderColor, fontWeight: FontWeight.bold)),
+        Text(
+          'Total ada $total pelanggan',
+          style: const TextStyle(fontSize: 13, color: borderColor, fontWeight: FontWeight.bold),
+        ),
       ],
     );
   }
@@ -82,20 +150,16 @@ class _PelangganScreenState extends State<PelangganScreen> {
   Widget _buildActionButtons() {
     return Row(
       children: [
-        Container(
-          margin: const EdgeInsets.only(right: 8),
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF91C4D9),
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: borderColor),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Tambah Pelanggan', style: TextStyle(fontWeight: FontWeight.w600)),
-            onPressed: () {},
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF91C4D9),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Tambah Pelanggan', style: TextStyle(fontWeight: FontWeight.w600)),
+          onPressed: _showAddCustomerDialog,
         ),
       ],
     );
@@ -127,146 +191,150 @@ class _PelangganScreenState extends State<PelangganScreen> {
     );
   }
 
-Widget _buildCustomerList(List<Map<String, String>> data) {
-  // column fixed widths
-  final colWidths = <double>[200, 200, 120, 120, 120, 80];
-  final totalCols = colWidths.reduce((a, b) => a + b);
-  const headerHorizontalPadding = 12.0 * 2; // left + right in header Container
-  final minTableWidth = totalCols + headerHorizontalPadding;
+  Widget _buildCustomerList(List<Map<String, dynamic>> data) {
+    const double rowHeight = 68;
+    const int maxVisibleRows = 4; // maksimal 4 row, sisanya scroll
+    final double tableHeight = (data.length > maxVisibleRows ? maxVisibleRows : data.length) * rowHeight;
 
-  const rowHeight = 68.0;
-  const headerHeight = 56.0;
-  final visibleRows = math.min(10, data.length);
+    final headers = [
+      {'title': 'Nama', 'width': 200.0},
+      {'title': 'Alamat', 'width': 200.0},
+      {'title': 'Telepon', 'width': 120.0},
+      {'title': 'Total Pembelian', 'width': 130.0},
+      {'title': 'Bergabung', 'width': 120.0},
+      {'title': 'Aksi', 'width': 80.0},
+    ];
 
-  return Container(
-    decoration: BoxDecoration(
-      color: cardBg,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: borderColor, width: 1.5),
-    ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: ConstrainedBox(
-        // ensure min width is at least the sum of column widths + paddings
-        constraints: BoxConstraints(minWidth: minTableWidth),
-        child: LayoutBuilder(builder: (context, constraints) {
-          // constraints.maxWidth may be Infinity when inside horizontal SingleChildScrollView.
-          // Use minTableWidth when maxWidth is unbounded.
-          final tableWidth = constraints.maxWidth.isFinite
-              ? math.max(minTableWidth, constraints.maxWidth)
-              : minTableWidth;
-
-          // limit table height to available area but allow vertical scrolling inside
-          final maxAvailableHeight = constraints.maxHeight.isFinite
-              ? constraints.maxHeight
-              : MediaQuery.of(context).size.height * 0.5;
-          final computedHeight = math.min(maxAvailableHeight, headerHeight + visibleRows * rowHeight);
-
-          return SizedBox(
-            width: tableWidth,
-            height: computedHeight,
-            child: Column(
-              children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    border: Border(bottom: BorderSide(color: borderColor, width: 2.8)),
-                  ),
-                  child: Row(
-                    children: [
-                      SizedBox(width: colWidths[0], child: const Text('Nama', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: colWidths[1], child: const Text('Email', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: colWidths[2], child: const Text('Telepon', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: colWidths[3], child: const Text('Total Transaksi', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: colWidths[4], child: const Text('Bergabung', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: colWidths[5], child: const Text('Aksi', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-                    ],
-                  ),
-                ),
-
-                // Rows: ListView handles vertical scrolling
-                Expanded(
-                  child: ListView.separated(
-                    padding: EdgeInsets.zero,
-                    itemCount: data.length,
-                    separatorBuilder: (context, index) => Divider(color: borderColor, thickness: 2, height: 2),
-                    itemBuilder: (context, index) {
-                      final c = data[index];
-                      return SizedBox(
-                        height: rowHeight,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: colWidths[0],
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(c['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                    const SizedBox(height: 4),
-                                    Text(c['address']!, style: const TextStyle(color: Color(0xFF91C4D9), fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: colWidths[1], child: Center(child: Text(c['email']!, style: const TextStyle(fontSize: 16)))),
-                            SizedBox(width: colWidths[2], child: Center(child: Text(c['phone']!, style: const TextStyle(fontSize: 16)))),
-                            SizedBox(width: colWidths[3], child: Center(child: Text(c['total']!, style: const TextStyle(fontSize: 16)))),
-                            SizedBox(width: colWidths[4], child: Center(child: Text(c['joined']!, style: const TextStyle(fontSize: 16)))),
-                            SizedBox(
-                              width: colWidths[5],
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Container(
-                                    width: 34,
-                                    height: 34,
-                                    margin: const EdgeInsets.only(right: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      border: Border.all(color: borderColor),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: IconButton(
-                                      padding: EdgeInsets.zero,
-                                      icon: const Icon(Icons.remove_red_eye_outlined, size: 18),
-                                      onPressed: () {},
-                                    ),
-                                  ),
-                                  Container(
-                                    width: 34,
-                                    height: 34,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      border: Border.all(color: borderColor),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: IconButton(
-                                      padding: EdgeInsets.zero,
-                                      icon: const Icon(Icons.edit, size: 18),
-                                      onPressed: () {},
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        border: Border.all(color: borderColor, width: 1.5),
+        borderRadius: BorderRadius.circular(8),
       ),
-    ),
-  );
-}
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
+          child: Column(
+            children: [
+              // HEADER
+              Row(
+                children: headers.map((h) {
+                  final double width = h['width'] as double;
+                  return Container(
+                    width: width,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: borderColor, width: 2),
+                      ),
+                    ),
+                    child: Text(
+                      h['title'].toString(),
+                      textAlign: h['title'] == 'Nama' ? TextAlign.left : TextAlign.center,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  );
+                }).toList(),
+              ),
+              // BODY
+              SizedBox(
+                height: tableHeight,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: Column(
+                    children: data.map((c) {
+                      return Row(
+                        children: [
+                          _buildCell(c['namapelanggan'].toString(), width: 200, isFirst: true, subText: c['email']?.toString()),
+                          _buildCell(c['alamat']?.toString() ?? '-', width: 200),
+                          _buildCell(c['nomortelepon']?.toString() ?? '-', width: 120),
+                          _buildCell(c['totalTransaksi'].toString(), width: 120),
+                          _buildCell(c['created_at']?.toString().split('T').first ?? '-', width: 120),
+                          _buildActionCell(c),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCell(String text, {required double width, bool isFirst = false, String? subText}) {
+    return Container(
+      width: width,
+      height: 68,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: borderColor, width: 1),
+        ),
+      ),
+      child: isFirst
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
+                if (subText != null)
+                  Text(subText, style: const TextStyle(fontSize: 13, color: borderColor, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+              ],
+            )
+          : Center(child: Text(text, style: const TextStyle(fontSize: 14))),
+    );
+  }
+
+  Widget _buildActionCell(Map<String, dynamic> c) {
+    return Container(
+      width: 80,
+      height: 68,
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: borderColor, width: 1),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // Eye icon
+          Container(
+            width: 34,
+            height: 34,
+            margin: const EdgeInsets.only(right: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: borderColor),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.remove_red_eye_outlined, size: 18),
+              onPressed: c['pelangganid'] == null ? null : () => _openBuyHistory(c['pelangganid']),
+            ),
+          ),
+          // Edit icon
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: borderColor),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.edit, size: 18),
+              onPressed: () => _showEditCustomerDialog(c),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
