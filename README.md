@@ -2,6 +2,10 @@
 
 A new Flutter project.
 
+Log-in Account:
+email: admincoba@gmail.com
+password: 123456
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.
