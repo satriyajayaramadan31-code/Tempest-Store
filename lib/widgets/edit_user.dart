@@ -13,13 +13,16 @@ class EditUserDialog extends StatefulWidget {
 }
 
 class _EditUserDialogState extends State<EditUserDialog> {
-  final formKey = GlobalKey<FormState>();
-
   late TextEditingController nameCtl;
   late TextEditingController emailCtl;
   String? roleVal;
 
   bool loading = false;
+
+  bool nameEmpty = false;
+  bool emailEmpty = false;
+  bool emailWrong = false;
+  bool roleError = false;
 
   final Color borderColor = const Color(0xFF3A71A4);
   final Color saveColor = const Color(0xFF91C4D9);
@@ -40,7 +43,15 @@ class _EditUserDialogState extends State<EditUserDialog> {
   }
 
   Future<void> _submit() async {
-    if (!formKey.currentState!.validate()) return;
+    setState(() {
+      nameEmpty = nameCtl.text.trim().isEmpty;
+      emailEmpty = emailCtl.text.trim().isEmpty;
+      emailWrong = !emailEmpty &&
+          !RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(emailCtl.text.trim());
+      roleError = roleVal == null;
+    });
+
+    if (nameEmpty || emailEmpty || emailWrong || roleError) return;
 
     setState(() => loading = true);
 
@@ -51,8 +62,6 @@ class _EditUserDialogState extends State<EditUserDialog> {
       'username': nameCtl.text.trim(),
       'role': roleVal,
     };
-
-    debugPrint('[EditUser] Payload: $payload');
 
     try {
       final response = await Supabase.instance.client.functions.invoke(
@@ -68,8 +77,6 @@ class _EditUserDialogState extends State<EditUserDialog> {
           result = Map<String, dynamic>.from(response.data);
         }
       }
-
-      debugPrint('[EditUser] Response: $result');
 
       if (result.containsKey("error")) {
         _showPopup(
@@ -93,8 +100,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
         iconColor: Colors.red,
         text: "Koneksi lambat, coba lagi.",
       );
-    } catch (e, st) {
-      debugPrint('[EditUser] Exception: $e\n$st');
+    } catch (e) {
       _showPopup(
         icon: Icons.warning_rounded,
         iconColor: Colors.red,
@@ -105,9 +111,6 @@ class _EditUserDialogState extends State<EditUserDialog> {
     }
   }
 
-  // ----------------------------------------------------
-  // ✨ Popup sama seperti Tambah User
-  // ----------------------------------------------------
   void _showPopup({
     required IconData icon,
     required Color iconColor,
@@ -140,10 +143,8 @@ class _EditUserDialogState extends State<EditUserDialog> {
                     ),
                   ],
                 ),
-
                 Icon(icon, size: 100, color: iconColor),
                 const SizedBox(height: 24),
-
                 Text(
                   text,
                   textAlign: TextAlign.center,
@@ -153,7 +154,6 @@ class _EditUserDialogState extends State<EditUserDialog> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 12),
               ],
             ),
@@ -163,35 +163,65 @@ class _EditUserDialogState extends State<EditUserDialog> {
     );
   }
 
-  InputDecoration field() {
-    return InputDecoration(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      isDense: true,
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-      enabledBorder: OutlineInputBorder(
+  Widget _fieldWrapper({
+    required TextEditingController c,
+    required bool error,
+    required String hint,
+  }) {
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: error ? Colors.red : borderColor, width: 1.3),
         borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: borderColor, width: 1),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: borderColor, width: 2),
+      child: Center(
+        child: TextField(
+          controller: c,
+          style: const TextStyle(fontSize: 13),
+          onChanged: (_) {
+            setState(() {
+              if (c == nameCtl) nameEmpty = false;
+              if (c == emailCtl) {
+                emailEmpty = false;
+                emailWrong = false;
+              }
+            });
+          },
+          decoration: InputDecoration(
+            isDense: true,
+            border: InputBorder.none,
+            hintText: hint,
+            hintStyle: const TextStyle(fontSize: 12),
+          ),
+        ),
       ),
     );
   }
 
+  Widget _errorText(String t) => Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            t,
+            textAlign: TextAlign.left,
+            style: const TextStyle(color: Colors.red, fontSize: 11),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 30, vertical: 80),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: borderColor, width: 2),
       ),
       backgroundColor: Colors.white,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 340),
+        constraints: const BoxConstraints(maxWidth: 400),
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Stack(
@@ -206,123 +236,107 @@ class _EditUserDialogState extends State<EditUserDialog> {
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
-              Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2),
-                      child: Text(
-                        "Edit Pengguna",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Edit Pengguna",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
+                  ),
+                  const SizedBox(height: 16),
 
-                    const SizedBox(height: 18),
+                  _fieldLabel("Nama Lengkap:"),
+                  _fieldWrapper(c: nameCtl, error: nameEmpty, hint: "Masukkan nama..."),
+                  if (nameEmpty) _errorText("Nama wajib diisi"),
 
-                    _fieldLabel("Nama Lengkap:"),
-                    const SizedBox(height: 3),
-                    SizedBox(
-                      height: 36,
-                      child: TextFormField(
-                        controller: nameCtl,
-                        decoration: field(),
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? "Wajib diisi" : null,
-                      ),
+                  const SizedBox(height: 10),
+                  _fieldLabel("Email:"),
+                  _fieldWrapper(c: emailCtl, error: emailEmpty || emailWrong, hint: "Masukkan email..."),
+                  if (emailEmpty)
+                    _errorText("Email wajib diisi")
+                  else if (emailWrong)
+                    _errorText("Format email salah"),
+
+                  const SizedBox(height: 10),
+                  _fieldLabel("Role:"),
+                  Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                          color: roleError ? Colors.red : borderColor, width: 1.3),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-
-                    const SizedBox(height: 8),
-                    _fieldLabel("Email:"),
-                    const SizedBox(height: 3),
-                    SizedBox(
-                      height: 36,
-                      child: TextFormField(
-                        controller: emailCtl,
-                        decoration: field(),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return "Email wajib";
-                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) {
-                            return "Format email salah";
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-                    _fieldLabel("Role:"),
-                    const SizedBox(height: 3),
-                    SizedBox(
-                      height: 36,
-                      child: DropdownButtonFormField<String>(
-                        decoration: field(),
-                        dropdownColor: Colors.white,
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
                         value: roleVal,
                         items: const [
                           DropdownMenuItem(value: "admin", child: Text("Admin")),
                           DropdownMenuItem(value: "kasir", child: Text("Kasir")),
                         ],
-                        onChanged: (v) => setState(() => roleVal = v),
-                        validator: (v) => v == null ? "Pilih role" : null,
+                        onChanged: (v) {
+                          setState(() {
+                            roleVal = v;
+                            roleError = false;
+                          });
+                        },
                       ),
                     ),
+                  ),
+                  if (roleError) _errorText("Pilih role"),
 
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 43,
-                      child: ElevatedButton(
-                        onPressed: loading ? null : _submit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: saveColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: borderColor, width: 1.5),
-                          ),
-                        ),
-                        child: loading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text(
-                                "Simpan",
-                                style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white),
-                              ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 43,
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 43,
+                    child: ElevatedButton(
+                      onPressed: loading ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: saveColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                           side: BorderSide(color: borderColor, width: 1.5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
                         ),
-                        child: const Text(
-                          "Batal",
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      ),
+                      child: loading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "Simpan",
+                              style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 43,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black,
+                        side: BorderSide(color: borderColor, width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "Batal",
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                  ],
-                ),
-              )
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -333,7 +347,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
   Widget _fieldLabel(String text) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
+      child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
     );
   }
 }

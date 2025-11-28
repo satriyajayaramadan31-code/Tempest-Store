@@ -59,7 +59,6 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         iconColor: Colors.red,
         text: "Terjadi kesalahan: $e",
       );
-      print(e);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -86,7 +85,6 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Tombol close di Row atas
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -99,10 +97,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                // Icon besar
                 Icon(icon, size: 100, color: iconColor),
                 const SizedBox(height: 24),
-                // Teks
                 Text(
                   text,
                   textAlign: TextAlign.center,
@@ -188,52 +184,70 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                     ),
                     const SizedBox(height: 18),
 
+                    // NAMA
                     _fieldLabel("Nama Lengkap:"),
                     const SizedBox(height: 3),
-                    SizedBox(
-                      height: 36,
-                      child: TextFormField(
-                        controller: nameCtl,
-                        decoration: fieldDecoration(),
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? "Wajib diisi" : null,
-                      ),
+                    TextFormField(
+                      controller: nameCtl,
+                      decoration: fieldDecoration(),
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? "Wajib diisi" : null,
                     ),
 
                     const SizedBox(height: 8),
+
+                    // EMAIL
                     _fieldLabel("Email:"),
                     const SizedBox(height: 3),
-                    SizedBox(
-                      height: 36,
-                      child: TextFormField(
-                        controller: emailCtl,
-                        decoration: fieldDecoration(),
-                      ),
+                    TextFormField(
+                      controller: emailCtl,
+                      decoration: fieldDecoration(),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return "Wajib diisi";
+                        }
+                        if (!v.trim().endsWith("@gmail.com")) {
+                          return "Harus berakhiran @gmail.com";
+                        }
+                        return null;
+                      },
                     ),
 
                     const SizedBox(height: 8),
+
+                    // ALAMAT
                     _fieldLabel("Alamat:"),
                     const SizedBox(height: 3),
-                    SizedBox(
-                      height: 36,
-                      child: TextFormField(
-                        controller: addressCtl,
-                        decoration: fieldDecoration(),
-                      ),
+                    TextFormField(
+                      controller: addressCtl,
+                      decoration: fieldDecoration(),
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? "Wajib diisi" : null,
                     ),
 
                     const SizedBox(height: 8),
+
+                    // NOMOR TELEPON
                     _fieldLabel("Nomor Telepon:"),
                     const SizedBox(height: 3),
-                    SizedBox(
-                      height: 36,
-                      child: TextFormField(
-                        controller: phoneCtl,
-                        decoration: fieldDecoration(),
-                      ),
+                    TextFormField(
+                      controller: phoneCtl,
+                      decoration: fieldDecoration(),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return "Wajib diisi";
+                        }
+                        if (!RegExp(r'^[0-9]+$').hasMatch(v.trim())) {
+                          return "Hanya boleh angka";
+                        }
+                        return null;
+                      },
                     ),
 
                     const SizedBox(height: 18),
+
+                    // SIMPAN
                     SizedBox(
                       width: double.infinity,
                       height: 43,
@@ -251,21 +265,23 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                             : const Text(
                                 "Simpan",
                                 style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white),
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                       ),
                     ),
 
                     const SizedBox(height: 12),
+
+                    // BATAL
                     SizedBox(
                       width: double.infinity,
                       height: 43,
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
                           foregroundColor: Colors.black,
                           side: BorderSide(color: borderColor, width: 1.5),
                           shape: RoundedRectangleBorder(

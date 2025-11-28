@@ -1,24 +1,10 @@
 // lib/widgets/edit_product.dart
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 const Color _borderColor = Color(0xFF3A71A4);
 const Color _pillBg = Color(0xFF91C4D9);
 
-/// Cara panggil:
-/// showEditProductDialog(
-///   context,
-///   product: {
-///     "namaproduk": "Milk",
-///     "SKU": "MLK001",
-///     "kategori": 1,
-///     "harga": 12000,
-///     "minimum": 5
-///   },
-///   categories: {'Minuman': 1, 'Kue': 2, 'Snack': 3},
-///   onSubmit: (data) async { ... }
-/// );
 Future<void> showEditProductDialog(
   BuildContext context, {
   required Map<String, dynamic> product,
@@ -29,6 +15,7 @@ Future<void> showEditProductDialog(
     context: context,
     barrierDismissible: true,
     builder: (_) => _EditProductDialog(
+      rootContext: context, // ⬅ penting
       product: product,
       categories: categories,
       onSubmit: onSubmit,
@@ -37,12 +24,13 @@ Future<void> showEditProductDialog(
 }
 
 class _EditProductDialog extends StatefulWidget {
+  final BuildContext rootContext; // ⬅ simpan context utama
   final Map<String, dynamic> product;
   final Map<String, int> categories;
   final Future<void> Function(Map<String, dynamic> data) onSubmit;
 
   const _EditProductDialog({
-    super.key,
+    required this.rootContext,
     required this.product,
     required this.categories,
     required this.onSubmit,
@@ -60,20 +48,32 @@ class _EditProductDialogState extends State<_EditProductDialog> {
 
   String? selectedCategory;
 
+  bool nameEmpty = false;
+  bool skuEmpty = false;
+  bool priceEmpty = false;
+  bool priceNotNumber = false;
+  bool minStockEmpty = false;
+  bool minStockNotNumber = false;
+  bool categoryError = false;
+
   @override
   void initState() {
     super.initState();
+
     nameController =
         TextEditingController(text: widget.product['namaproduk'] ?? '');
-    skuController = TextEditingController(text: widget.product['SKU'] ?? '');
-    priceController =
-        TextEditingController(text: widget.product['harga']?.toString() ?? '');
-    minStockController =
-        TextEditingController(text: widget.product['minimum']?.toString() ?? '');
+    skuController =
+        TextEditingController(text: widget.product['SKU'] ?? '');
+    priceController = TextEditingController(
+        text: widget.product['harga']?.toString() ?? '');
+    minStockController = TextEditingController(
+        text: widget.product['minimum']?.toString() ?? '');
+
     selectedCategory = widget.categories.entries
         .firstWhere(
-            (e) => e.value == widget.product['kategori'],
-            orElse: () => widget.categories.entries.first)
+          (e) => e.value == widget.product['kategori'],
+          orElse: () => widget.categories.entries.first,
+        )
         .key;
   }
 
@@ -99,7 +99,6 @@ class _EditProductDialogState extends State<_EditProductDialog> {
         padding: const EdgeInsets.all(18.0),
         child: SingleChildScrollView(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Stack(
@@ -125,28 +124,48 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                 ],
               ),
               const SizedBox(height: 18),
-              _labelText('Nama Produk:'),
-              const SizedBox(height: 6),
-              _buildTextField(nameController, 'Masukkan nama produk...'),
+
+              _label("Nama Produk:"),
+              _field(nameController, "Masukkan nama produk...", nameEmpty),
+              if (nameEmpty) _error("Nama produk harus diisi"),
               const SizedBox(height: 12),
-              _labelText('SKU:'),
-              const SizedBox(height: 6),
-              _buildTextField(skuController, 'Masukkan SKU...'),
+
+              _label("SKU:"),
+              _field(skuController, "Masukkan SKU...", skuEmpty),
+              if (skuEmpty) _error("SKU harus diisi"),
               const SizedBox(height: 12),
-              _labelText('Kategori:'),
-              const SizedBox(height: 6),
+
+              _label("Kategori:"),
               _buildCategoryDropdown(),
+              if (categoryError) _error("Kategori harus dipilih"),
               const SizedBox(height: 12),
-              _labelText('Harga:'),
-              const SizedBox(height: 6),
-              _buildTextField(priceController, 'Masukkan harga',
-                  keyboardType: TextInputType.number),
+
+              _label("Harga:"),
+              _field(
+                priceController,
+                "Masukkan harga",
+                priceEmpty || priceNotNumber,
+                keyboardType: TextInputType.number,
+              ),
+              if (priceEmpty)
+                _error("Harga harus diisi")
+              else if (priceNotNumber)
+                _error("Harga harus berupa angka"),
               const SizedBox(height: 12),
-              _labelText('Batas Stok Minimum:'),
-              const SizedBox(height: 6),
-              _buildTextField(minStockController, 'Masukkan batas minimum',
-                  keyboardType: TextInputType.number),
-              const SizedBox(height: 18),
+
+              _label("Batas Stok Minimum:"),
+              _field(
+                minStockController,
+                "Masukkan batas minimum",
+                minStockEmpty || minStockNotNumber,
+                keyboardType: TextInputType.number,
+              ),
+              if (minStockEmpty)
+                _error("Minimum stok harus diisi")
+              else if (minStockNotNumber)
+                _error("Minimum stok harus berupa angka"),
+              const SizedBox(height: 20),
+
               _buildSubmitButton(),
             ],
           ),
@@ -155,32 +174,52 @@ class _EditProductDialogState extends State<_EditProductDialog> {
     );
   }
 
-  Widget _labelText(String text) {
-    return Text(
-      text,
-      style: const TextStyle(fontWeight: FontWeight.w700),
-    );
-  }
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      );
 
-  Widget _buildTextField(TextEditingController controller, String hintText,
-      {TextInputType? keyboardType}) {
+  Widget _error(String txt) => Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text(
+          txt,
+          style: const TextStyle(color: Colors.red, fontSize: 11),
+        ),
+      );
+
+  Widget _field(
+    TextEditingController c,
+    String hint,
+    bool error, {
+    TextInputType? keyboardType,
+  }) {
     return Container(
-      height: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: _borderColor),
+        border: Border.all(
+          color: error ? Colors.red : _borderColor,
+          width: 1.4,
+        ),
+        borderRadius: BorderRadius.circular(5),
       ),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        style: const TextStyle(fontSize: 12),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 0),
-          hintText: hintText,
+      child: Center(
+        child: TextField(
+          controller: c,
+          keyboardType: keyboardType,
+          style: const TextStyle(fontSize: 12),
+          decoration: InputDecoration(
+            isDense: true,
+            border: InputBorder.none,
+            hintText: hint,
+            hintStyle: const TextStyle(fontSize: 12),
+          ),
         ),
       ),
     );
@@ -188,35 +227,32 @@ class _EditProductDialogState extends State<_EditProductDialog> {
 
   Widget _buildCategoryDropdown() {
     return Container(
-      height: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: _borderColor),
+        border: Border.all(
+          color: categoryError ? Colors.red : _borderColor,
+          width: 1.4,
+        ),
+        borderRadius: BorderRadius.circular(5),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton2<String>(
           isExpanded: true,
           value: selectedCategory,
           items: widget.categories.keys
-              .map((e) => DropdownMenuItem<String>(
-                    value: e,
-                    child: Text(
-                      e,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ))
+              .map(
+                (e) => DropdownMenuItem<String>(
+                  value: e,
+                  child: Text(e, style: const TextStyle(fontSize: 12)),
+                ),
+              )
               .toList(),
-          onChanged: (v) => setState(() => selectedCategory = v),
-          dropdownStyleData: DropdownStyleData(
-            maxHeight: 150,
-            decoration: BoxDecoration(
-              border: Border.all(color: _borderColor),
-              borderRadius: BorderRadius.circular(6),
-              color: Colors.white,
-            ),
-          ),
+          onChanged: (value) {
+            setState(() => selectedCategory = value);
+          },
+          buttonStyleData: const ButtonStyleData(height: 32),
+          dropdownStyleData: const DropdownStyleData(maxHeight: 200),
         ),
       ),
     );
@@ -224,20 +260,19 @@ class _EditProductDialogState extends State<_EditProductDialog> {
 
   Widget _buildSubmitButton() {
     return SizedBox(
-      height: 56,
+      height: 52,
       child: ElevatedButton(
-        onPressed: _onEditProductPressed,
+        onPressed: _onSubmit,
         style: ElevatedButton.styleFrom(
           backgroundColor: _pillBg,
           foregroundColor: _borderColor,
-          elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
             side: const BorderSide(color: _borderColor, width: 2),
           ),
         ),
         child: const Text(
-          'Simpan Perubahan',
+          "Simpan Perubahan",
           style: TextStyle(
             fontWeight: FontWeight.w800,
             color: Colors.white,
@@ -248,17 +283,29 @@ class _EditProductDialogState extends State<_EditProductDialog> {
     );
   }
 
-  Future<void> _onEditProductPressed() async {
-    if (nameController.text.trim().isEmpty ||
-        skuController.text.trim().isEmpty ||
-        selectedCategory == null ||
-        priceController.text.trim().isEmpty ||
-        minStockController.text.trim().isEmpty) {
-      await _showPopup(
-        icon: Icons.warning_rounded,
-        iconColor: Colors.red,
-        text: "Lengkapi semua field",
-      );
+  Future<void> _onSubmit() async {
+    setState(() {
+      nameEmpty = nameController.text.trim().isEmpty;
+      skuEmpty = skuController.text.trim().isEmpty;
+
+      priceEmpty = priceController.text.trim().isEmpty;
+      priceNotNumber =
+          !priceEmpty && double.tryParse(priceController.text.trim()) == null;
+
+      minStockEmpty = minStockController.text.trim().isEmpty;
+      minStockNotNumber =
+          !minStockEmpty && int.tryParse(minStockController.text.trim()) == null;
+
+      categoryError = selectedCategory == null;
+    });
+
+    if (nameEmpty ||
+        skuEmpty ||
+        priceEmpty ||
+        priceNotNumber ||
+        minStockEmpty ||
+        minStockNotNumber ||
+        categoryError) {
       return;
     }
 
@@ -266,79 +313,72 @@ class _EditProductDialogState extends State<_EditProductDialog> {
       "namaproduk": nameController.text.trim(),
       "SKU": skuController.text.trim(),
       "kategori": widget.categories[selectedCategory],
-      "harga": double.tryParse(priceController.text.trim()) ?? 0,
-      "minimum": int.tryParse(minStockController.text.trim()) ?? 0,
+      "harga": double.parse(priceController.text.trim()),
+      "minimum": int.parse(minStockController.text.trim()),
     };
 
     try {
       await widget.onSubmit(data);
 
       if (!mounted) return;
+
+      // Tutup dialog edit
       Navigator.of(context).pop();
 
-      await _showPopup(
-        icon: Icons.check_circle,
-        iconColor: Colors.green,
-        text: "Produk Berhasil \nDiperbarui",
+      // Popup menggunakan rootContext
+      await _popup(
+        widget.rootContext,
+        Icons.check_circle,
+        Colors.green,
+        "Produk Berhasil \nDiperbarui",
       );
     } catch (e) {
-      if (!mounted) return;
-      await _showPopup(
-        icon: Icons.warning_rounded,
-        iconColor: Colors.red,
-        text: "Terjadi kesalahan: $e",
+      await _popup(
+        widget.rootContext,
+        Icons.warning_rounded,
+        Colors.red,
+        "Terjadi kesalahan: $e",
       );
-      debugPrint(e.toString());
     }
   }
 
-  Future<void> _showPopup({
-    required IconData icon,
-    required Color iconColor,
-    required String text,
-  }) {
+  Future<void> _popup(
+    BuildContext ctx,
+    IconData icon,
+    Color color,
+    String text,
+  ) {
     return showDialog(
       barrierDismissible: false,
-      context: context,
-      builder: (context) => Dialog(
+      context: ctx, // ⬅ aman
+      builder: (_) => Dialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: _borderColor, width: 2),
         ),
-        backgroundColor: Colors.white,
-        child: SizedBox(
-          width: 320,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        if (Navigator.canPop(context)) Navigator.pop(context);
-                      },
-                    ),
-                  ],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(ctx), // ⬅ aman
+                  icon: const Icon(Icons.close),
                 ),
-                const SizedBox(height: 4),
-                Icon(icon, size: 100, color: iconColor),
-                const SizedBox(height: 24),
-                Text(
-                  text,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    height: 1.3,
-                    fontWeight: FontWeight.bold,
-                  ),
+              ),
+              Icon(icon, size: 100, color: color),
+              const SizedBox(height: 18),
+              Text(
+                text,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 12),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

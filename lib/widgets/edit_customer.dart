@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:tempest_store/services/supabase_service.dart';
 
 class EditCustomerDialog extends StatefulWidget {
-  final Map<String, dynamic> customer; // data pelanggan yang mau diedit
+  final Map<String, dynamic> customer;
 
   const EditCustomerDialog({super.key, required this.customer});
 
@@ -14,11 +14,19 @@ class EditCustomerDialog extends StatefulWidget {
 
 class _EditCustomerDialogState extends State<EditCustomerDialog> {
   final formKey = GlobalKey<FormState>();
+
   late TextEditingController nameCtl;
   late TextEditingController emailCtl;
   late TextEditingController addressCtl;
   late TextEditingController phoneCtl;
+
   bool loading = false;
+
+  // error messages (null = no error)
+  String? nameErrorMsg;
+  String? emailErrorMsg;
+  String? addressErrorMsg;
+  String? phoneErrorMsg;
 
   final Color borderColor = const Color(0xFF3A71A4);
   final Color saveColor = const Color(0xFF91C4D9);
@@ -41,8 +49,95 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
     super.dispose();
   }
 
+  InputDecoration fieldDecoration() {
+    return InputDecoration(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: borderColor, width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: borderColor, width: 2),
+      ),
+      // don't rely on built-in errorText to avoid field resize — show errors manually
+      errorStyle: const TextStyle(fontSize: 0, height: 0),
+    );
+  }
+
+  Widget _fieldLabel(String text) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _errorText(String? txt) {
+    if (txt == null) return const SizedBox.shrink();
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text(
+          txt,
+          textAlign: TextAlign.left,
+          style: const TextStyle(color: Colors.red, fontSize: 11),
+        ),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
-    if (!formKey.currentState!.validate()) return;
+    // reset errors
+    setState(() {
+      nameErrorMsg = null;
+      emailErrorMsg = null;
+      addressErrorMsg = null;
+      phoneErrorMsg = null;
+    });
+
+    final name = nameCtl.text.trim();
+    final email = emailCtl.text.trim();
+    final address = addressCtl.text.trim();
+    final phone = phoneCtl.text.trim();
+
+    bool hasError = false;
+
+    if (name.isEmpty) {
+      nameErrorMsg = "Wajib diisi";
+      hasError = true;
+    }
+
+    if (email.isEmpty) {
+      emailErrorMsg = "Wajib diisi";
+      hasError = true;
+    } else if (!email.endsWith("@gmail.com")) {
+      emailErrorMsg = "Harus berakhiran @gmail.com";
+      hasError = true;
+    }
+
+    if (address.isEmpty) {
+      addressErrorMsg = "Wajib diisi";
+      hasError = true;
+    }
+
+    if (phone.isEmpty) {
+      phoneErrorMsg = "Wajib diisi";
+      hasError = true;
+    } else if (!RegExp(r'^[0-9]+$').hasMatch(phone)) {
+      phoneErrorMsg = "Hanya boleh angka";
+      hasError = true;
+    }
+
+    if (hasError) {
+      // show errors under fields without changing field heights
+      setState(() {});
+      return;
+    }
 
     setState(() => loading = true);
 
@@ -52,10 +147,10 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
       await service.updatePelanggan(
         widget.customer['pelangganid'],
         {
-          'namapelanggan': nameCtl.text.trim(),
-          'email': emailCtl.text.trim(),
-          'alamat': addressCtl.text.trim(),
-          'nomortelepon': phoneCtl.text.trim(),
+          'namapelanggan': name,
+          'email': email,
+          'alamat': address,
+          'nomortelepon': phone,
         },
       );
 
@@ -65,12 +160,6 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
         icon: Icons.check_circle,
         iconColor: Colors.green,
         text: "Pelanggan Berhasil\nDiedit",
-      );
-    } on TimeoutException {
-      _showPopup(
-        icon: Icons.warning_rounded,
-        iconColor: Colors.red,
-        text: "Koneksi lambat, coba lagi.",
       );
     } catch (e) {
       _showPopup(
@@ -99,6 +188,7 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
     if (confirm != true) return;
 
     setState(() => loading = true);
+
     try {
       final service = SupabaseService();
       await service.deletePelanggan(widget.customer['pelangganid']);
@@ -170,31 +260,6 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
     );
   }
 
-  InputDecoration fieldDecoration() {
-    return InputDecoration(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: borderColor, width: 1),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: borderColor, width: 2),
-      ),
-      filled: true,
-      fillColor: Colors.white,
-      isDense: true,
-    );
-  }
-
-  Widget _fieldLabel(String text) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -220,6 +285,7 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
+
               Form(
                 key: formKey,
                 child: Column(
@@ -234,7 +300,7 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
                     ),
                     const SizedBox(height: 18),
 
-                    // Nama
+                    // NAMA
                     _fieldLabel("Nama Lengkap:"),
                     const SizedBox(height: 3),
                     SizedBox(
@@ -242,13 +308,13 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
                       child: TextFormField(
                         controller: nameCtl,
                         decoration: fieldDecoration(),
-                        validator: (v) => v == null || v.trim().isEmpty ? "Wajib diisi" : null,
+                        // no validator here — we show error text manually below
                       ),
                     ),
-
+                    _errorText(nameErrorMsg),
                     const SizedBox(height: 8),
 
-                    // Email
+                    // EMAIL
                     _fieldLabel("Email:"),
                     const SizedBox(height: 3),
                     SizedBox(
@@ -256,17 +322,13 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
                       child: TextFormField(
                         controller: emailCtl,
                         decoration: fieldDecoration(),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return "Wajib diisi";
-                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) return "Format email salah";
-                          return null;
-                        },
+                        keyboardType: TextInputType.emailAddress,
                       ),
                     ),
-
+                    _errorText(emailErrorMsg),
                     const SizedBox(height: 8),
 
-                    // Alamat
+                    // ALAMAT
                     _fieldLabel("Alamat:"),
                     const SizedBox(height: 3),
                     SizedBox(
@@ -276,10 +338,10 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
                         decoration: fieldDecoration(),
                       ),
                     ),
-
+                    _errorText(addressErrorMsg),
                     const SizedBox(height: 8),
 
-                    // Nomor Telepon
+                    // NOMOR TELEPON
                     _fieldLabel("Nomor Telepon:"),
                     const SizedBox(height: 3),
                     SizedBox(
@@ -287,12 +349,13 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
                       child: TextFormField(
                         controller: phoneCtl,
                         decoration: fieldDecoration(),
+                        keyboardType: TextInputType.number,
                       ),
                     ),
-
+                    _errorText(phoneErrorMsg),
                     const SizedBox(height: 18),
 
-                    // Tombol Simpan
+                    // BUTTON SIMPAN
                     SizedBox(
                       width: double.infinity,
                       height: 43,
@@ -302,20 +365,25 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
                           backgroundColor: saveColor,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: borderColor, width: 1.5),
                           ),
                         ),
                         child: loading
                             ? const CircularProgressIndicator(color: Colors.white)
                             : const Text(
                                 "Simpan",
-                                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                       ),
                     ),
 
                     const SizedBox(height: 12),
 
-                    // Tombol Hapus
+                    // BUTTON HAPUS
                     SizedBox(
                       width: double.infinity,
                       height: 43,
@@ -323,7 +391,9 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
                         onPressed: loading ? null : _delete,
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(color: borderColor, width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: const Text(
                           "Hapus",
@@ -333,7 +403,7 @@ class _EditCustomerDialogState extends State<EditCustomerDialog> {
                     ),
                   ],
                 ),
-              )
+              ),
             ],
           ),
         ),

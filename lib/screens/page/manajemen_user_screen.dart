@@ -245,10 +245,11 @@ class _ManajemenUserScreenState extends State<ManajemenUserScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                "Total: ${_users.length} user",
+                                "Total ada ${_users.length} user",
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.black.withOpacity(0.7),
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF3A71A4),
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -364,11 +365,12 @@ class _ManajemenUserScreenState extends State<ManajemenUserScreen> {
                         flex: 3,
                         child: Text(u['username'] ?? '-',
                             style: const TextStyle(
-                                fontWeight: FontWeight.w600))),
+                                fontWeight: FontWeight.bold))),
                     Expanded(
                         flex: 4,
                         child: Text(u['email'] ?? '-',
-                            style: const TextStyle(color: Colors.black54))),
+                            style: const TextStyle(color: Colors.black,
+                            fontWeight: FontWeight.bold))),
                     Expanded(
                         flex: 2,
                         child: Text(u['role'] ?? '-',

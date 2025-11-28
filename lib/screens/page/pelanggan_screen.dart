@@ -5,6 +5,7 @@ import 'package:tempest_store/widgets/add_customer.dart';
 import 'package:tempest_store/widgets/edit_customer.dart';
 import 'package:tempest_store/screens/page/buy_history.dart';
 import 'package:tempest_store/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PelangganScreen extends StatefulWidget {
   const PelangganScreen({super.key});
@@ -23,10 +24,38 @@ class _PelangganScreenState extends State<PelangganScreen> {
   List<Map<String, dynamic>> customers = [];
   bool isLoading = true;
 
+  RealtimeChannel? _customerChannel; // ← FIXED (RealtimeChannel yang benar)
+
   @override
   void initState() {
     super.initState();
     fetchCustomers();
+    _setupRealtime(); // realtime listener
+  }
+
+  // REALTIME LISTENER
+  void _setupRealtime() {
+    _customerChannel = Supabase.instance.client
+        .channel('public:kasir_pelanggan') // channel ID
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'kasir_pelanggan',
+        callback: (_) => fetchCustomers(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'kasir_penjualan',
+        callback: (_) => fetchCustomers(),
+      )
+      ..subscribe();
+  }
+
+  @override
+  void dispose() {
+    _customerChannel?.unsubscribe();
+    super.dispose();
   }
 
   Future<void> fetchCustomers() async {
@@ -35,16 +64,19 @@ class _PelangganScreenState extends State<PelangganScreen> {
       final service = SupabaseService();
       final pelangganList = await service.getPelanggan();
 
+      // Hitung total transaksi per pelanggan
       final res = await SupabaseService.client
           .from('kasir_penjualan')
           .select('pelangganid');
-      final penjualanData = res as List<dynamic>? ?? [];
 
+      final penjualanData = res as List<dynamic>? ?? [];
       final Map<int, int> totalTransaksiMap = {};
+
       for (var p in penjualanData) {
         final id = p['pelangganid'] as int?;
-        if (id == null) continue;
-        totalTransaksiMap[id] = (totalTransaksiMap[id] ?? 0) + 1;
+        if (id != null) {
+          totalTransaksiMap[id] = (totalTransaksiMap[id] ?? 0) + 1;
+        }
       }
 
       final merged = pelangganList.map((c) {
@@ -193,7 +225,7 @@ class _PelangganScreenState extends State<PelangganScreen> {
 
   Widget _buildCustomerList(List<Map<String, dynamic>> data) {
     const double rowHeight = 68;
-    const int maxVisibleRows = 4; // maksimal 4 row, sisanya scroll
+    const int maxVisibleRows = 4;
     final double tableHeight = (data.length > maxVisibleRows ? maxVisibleRows : data.length) * rowHeight;
 
     final headers = [
@@ -217,7 +249,6 @@ class _PelangganScreenState extends State<PelangganScreen> {
           constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
           child: Column(
             children: [
-              // HEADER
               Row(
                 children: headers.map((h) {
                   final double width = h['width'] as double;
@@ -237,7 +268,6 @@ class _PelangganScreenState extends State<PelangganScreen> {
                   );
                 }).toList(),
               ),
-              // BODY
               SizedBox(
                 height: tableHeight,
                 child: SingleChildScrollView(
@@ -246,9 +276,9 @@ class _PelangganScreenState extends State<PelangganScreen> {
                     children: data.map((c) {
                       return Row(
                         children: [
-                          _buildCell(c['namapelanggan'].toString(), width: 200, isFirst: true, subText: c['email']?.toString()),
-                          _buildCell(c['alamat']?.toString() ?? '-', width: 200),
-                          _buildCell(c['nomortelepon']?.toString() ?? '-', width: 120),
+                          _buildCell(c['namapelanggan'].toString(), width: 200, isFirst: true, subText: c['email']),
+                          _buildCell(c['alamat'] ?? '-', width: 200),
+                          _buildCell(c['nomortelepon'] ?? '-', width: 120),
                           _buildCell(c['totalTransaksi'].toString(), width: 120),
                           _buildCell(c['created_at']?.toString().split('T').first ?? '-', width: 120),
                           _buildActionCell(c),
@@ -302,7 +332,6 @@ class _PelangganScreenState extends State<PelangganScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // Eye icon
           Container(
             width: 34,
             height: 34,
@@ -318,7 +347,6 @@ class _PelangganScreenState extends State<PelangganScreen> {
               onPressed: c['pelangganid'] == null ? null : () => _openBuyHistory(c['pelangganid']),
             ),
           ),
-          // Edit icon
           Container(
             width: 34,
             height: 34,

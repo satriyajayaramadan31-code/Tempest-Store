@@ -5,12 +5,6 @@ import 'package:flutter/material.dart';
 const Color _borderColor = Color(0xFF3A71A4);
 const Color _pillBg = Color(0xFF91C4D9);
 
-/// Cara panggil:
-/// showAddStockDialog(
-///   context,
-///   products: ['Milk', 'Taro', 'Croissant'],
-///   onSubmit: (product, stock) { ... }
-/// );
 Future<void> showAddStockDialog(
   BuildContext context, {
   required List<String> products,
@@ -20,6 +14,7 @@ Future<void> showAddStockDialog(
     context: context,
     barrierDismissible: true,
     builder: (_) => _AddStockDialog(
+      rootContext: context,  // <- penting!
       products: products,
       onSubmit: onSubmit,
     ),
@@ -27,11 +22,13 @@ Future<void> showAddStockDialog(
 }
 
 class _AddStockDialog extends StatefulWidget {
+  final BuildContext rootContext; // <- simpan context utama
   final List<String> products;
   final Future<void> Function(String selectedProduct, int stock) onSubmit;
 
   const _AddStockDialog({
     super.key,
+    required this.rootContext,
     required this.products,
     required this.onSubmit,
   });
@@ -50,7 +47,13 @@ class _AddStockDialogState extends State<_AddStockDialog> {
     'Kue': 2,
     'Snack': 3,
   };
+
   String? selectedCategory;
+
+  bool errorProduct = false;
+  bool errorCategory = false;
+  bool errorStock = false;
+  bool stockNotNumber = false;
 
   @override
   void dispose() {
@@ -69,7 +72,7 @@ class _AddStockDialogState extends State<_AddStockDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
       backgroundColor: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(18.0),
+        padding: const EdgeInsets.all(18),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -96,19 +99,25 @@ class _AddStockDialogState extends State<_AddStockDialog> {
                 ),
               ],
             ),
+
             const SizedBox(height: 18),
+
             _labelText('Pilih Produk:'),
-            const SizedBox(height: 6),
             _buildProductAutocomplete(),
+            if (errorProduct) _errorText("Produk harus dipilih dari daftar"),
             const SizedBox(height: 12),
+
             _labelText('Kategori:'),
-            const SizedBox(height: 6),
             _buildCategoryDropdown(),
+            if (errorCategory) _errorText("Kategori harus dipilih"),
             const SizedBox(height: 12),
+
             _labelText('Jumlah Stok:'),
-            const SizedBox(height: 6),
             _buildStockField(),
-            const SizedBox(height: 18),
+            if (errorStock) _errorText("Stok wajib diisi"),
+            if (stockNotNumber) _errorText("Stok harus berupa angka"),
+            const SizedBox(height: 20),
+
             _buildSubmitButton(),
           ],
         ),
@@ -119,40 +128,57 @@ class _AddStockDialogState extends State<_AddStockDialog> {
   Widget _labelText(String text) {
     return Text(
       text,
-      style: const TextStyle(fontWeight: FontWeight.w700),
+      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+    );
+  }
+
+  Widget _errorText(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Text(
+        text,
+        style: const TextStyle(color: Colors.red, fontSize: 11),
+      ),
     );
   }
 
   Widget _buildProductAutocomplete() {
     return Container(
-      height: 25,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _borderColor),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: errorProduct ? Colors.red : _borderColor,
+          width: 1.5,
+        ),
       ),
       child: Autocomplete<String>(
         optionsBuilder: (TextEditingValue text) {
           if (text.text.isEmpty) return const Iterable<String>.empty();
-          return widget.products
-              .where((p) => p.toLowerCase().contains(text.text.toLowerCase()));
+          return widget.products.where(
+            (p) => p.toLowerCase().contains(text.text.trim().toLowerCase()),
+          );
         },
         onSelected: (selection) {
-          setState(() => selectedProduct = selection);
+          setState(() {
+            selectedProduct = selection;
+            errorProduct = false;
+          });
         },
         fieldViewBuilder: (context, controller, node, onEditingComplete) {
           return TextField(
             controller: controller,
             focusNode: node,
-            onChanged: (v) => selectedProduct = null,
-            onEditingComplete: onEditingComplete,
-            style: const TextStyle(fontSize: 14),
+            onChanged: (v) {
+              selectedProduct = null;
+              setState(() => errorProduct = false);
+            },
+            style: const TextStyle(fontSize: 12),
             decoration: const InputDecoration(
               border: InputBorder.none,
               isDense: true,
-              contentPadding: EdgeInsets.symmetric(vertical: 4),
-              hintText: 'Ketik atau pilih produk...',
+              contentPadding: EdgeInsets.symmetric(vertical: 6),
+              hintText: "Ketik atau pilih produk...",
             ),
           );
         },
@@ -162,30 +188,45 @@ class _AddStockDialogState extends State<_AddStockDialog> {
 
   Widget _buildCategoryDropdown() {
     return Container(
-      height: 25,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      height: 20,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _borderColor),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: errorCategory ? Colors.red : _borderColor,
+          width: 1.5,
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton2<String>(
           isExpanded: true,
-          hint: const Text('Pilih Kategori...'),
+          hint: const Text("Pilih Kategori...", style: TextStyle(fontSize: 12)),
           value: selectedCategory,
           items: categories.keys
-              .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
+              .map((e) => DropdownMenuItem(
+                    value: e,
+                    child: Text(e, style: const TextStyle(fontSize: 12)),
+                  ))
               .toList(),
-          onChanged: (v) => setState(() => selectedCategory = v),
+          onChanged: (v) {
+            setState(() {
+              selectedCategory = v;
+              errorCategory = false;
+            });
+          },
+          buttonStyleData: const ButtonStyleData(
+            padding: EdgeInsets.zero,
+            height: 20,
+          ),
           dropdownStyleData: DropdownStyleData(
-            maxHeight: 150,
+            maxHeight: 200,
             decoration: BoxDecoration(
-              border: Border.all(color: _borderColor),
-              borderRadius: BorderRadius.circular(6),
               color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: _borderColor, width: 1.5),
             ),
           ),
+          menuItemStyleData: const MenuItemStyleData(height: 28),
         ),
       ),
     );
@@ -193,21 +234,23 @@ class _AddStockDialogState extends State<_AddStockDialog> {
 
   Widget _buildStockField() {
     return Container(
-      height: 25,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _borderColor),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: (errorStock || stockNotNumber) ? Colors.red : _borderColor,
+          width: 1.5,
+        ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: TextField(
         controller: stockController,
         keyboardType: TextInputType.number,
+        style: const TextStyle(fontSize: 12),
         decoration: const InputDecoration(
           border: InputBorder.none,
           isDense: true,
-          contentPadding: EdgeInsets.symmetric(vertical: 4),
-          hintText: 'Masukkan Jumlah Stok...',
+          contentPadding: EdgeInsets.symmetric(vertical: 6),
+          hintText: "Masukkan jumlah stok...",
         ),
       ),
     );
@@ -215,120 +258,102 @@ class _AddStockDialogState extends State<_AddStockDialog> {
 
   Widget _buildSubmitButton() {
     return SizedBox(
-      height: 56,
+      height: 52,
       child: ElevatedButton(
         onPressed: _onAddStockPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: _pillBg,
-          foregroundColor: _borderColor,
-          elevation: 0,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
             side: const BorderSide(color: _borderColor, width: 2),
           ),
         ),
         child: const Text(
-          'Tambah Stok',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            fontSize: 16,
-          ),
+          "Tambah Stok",
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
         ),
       ),
     );
   }
 
+  // ===============================
+  // VALIDASI + SUBMIT
+  // ===============================
   Future<void> _onAddStockPressed() async {
-    if (selectedProduct == null) {
-      await _showPopup(
-        icon: Icons.warning_rounded,
-        iconColor: Colors.red,
-        text: "Pilih produk dari daftar",
-      );
-      return;
-    }
+    setState(() {
+      errorProduct = selectedProduct == null;
+      errorCategory = selectedCategory == null;
 
-    final int stock = int.tryParse(stockController.text.trim()) ?? 0;
-    if (stock <= 0) {
-      await _showPopup(
-        icon: Icons.warning_rounded,
-        iconColor: Colors.red,
-        text: "Stok harus lebih dari 0",
-      );
-      return;
-    }
+      errorStock = stockController.text.trim().isEmpty;
+      stockNotNumber =
+          !errorStock && int.tryParse(stockController.text.trim()) == null;
+    });
+
+    if (errorProduct || errorCategory || errorStock || stockNotNumber) return;
+
+    final stock = int.parse(stockController.text.trim());
 
     try {
       await widget.onSubmit(selectedProduct!, stock);
-
       if (!mounted) return;
 
-      // Tutup dialog utama sebelum menampilkan popup sukses
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(); // tutup dialog utama
 
+      // tampilkan popup SUKSES dengan context ROOT
       await _showPopup(
         icon: Icons.check_circle,
         iconColor: Colors.green,
         text: "Stok Berhasil \nDitambah",
+        ctx: widget.rootContext,
       );
     } catch (e) {
-      if (!mounted) return;
       await _showPopup(
         icon: Icons.warning_rounded,
         iconColor: Colors.red,
         text: "Terjadi kesalahan: $e",
+        ctx: widget.rootContext,
       );
     }
   }
 
+  // ===============================
+  // POPUP — pakai root context!
+  // ===============================
   Future<void> _showPopup({
     required IconData icon,
     required Color iconColor,
     required String text,
+    required BuildContext ctx,  // <- pakai context aman
   }) {
     return showDialog(
       barrierDismissible: false,
-      context: context,
-      builder: (context) => Dialog(
+      context: ctx,
+      builder: (_) => Dialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: _borderColor, width: 2),
         ),
-        backgroundColor: Colors.white,
-        child: SizedBox(
-          width: 320,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        if (Navigator.canPop(context)) Navigator.pop(context);
-                      },
-                    ),
-                  ],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Icons.close),
                 ),
-                const SizedBox(height: 4),
-                Icon(icon, size: 100, color: iconColor),
-                const SizedBox(height: 24),
-                Text(
-                  text,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    height: 1.3,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-            ),
+              ),
+              Icon(icon, size: 100, color: iconColor),
+              const SizedBox(height: 18),
+              Text(
+                text,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
         ),
       ),

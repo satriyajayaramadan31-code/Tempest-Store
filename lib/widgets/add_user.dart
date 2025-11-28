@@ -11,13 +11,19 @@ class AddUserDialog extends StatefulWidget {
 }
 
 class _AddUserDialogState extends State<AddUserDialog> {
-  final formKey = GlobalKey<FormState>();
   final nameCtl = TextEditingController();
   final emailCtl = TextEditingController();
   final passCtl = TextEditingController();
 
   String? roleVal;
   bool loading = false;
+
+  bool nameEmpty = false;
+  bool emailEmpty = false;
+  bool emailWrong = false;
+  bool passEmpty = false;
+  bool passShort = false;
+  bool roleError = false;
 
   final Color borderColor = const Color(0xFF3A71A4);
   final Color saveColor = const Color(0xFF91C4D9);
@@ -31,14 +37,22 @@ class _AddUserDialogState extends State<AddUserDialog> {
   }
 
   Future<void> _submit() async {
-    if (!formKey.currentState!.validate()) return;
+    setState(() {
+      nameEmpty = nameCtl.text.trim().isEmpty;
+      emailEmpty = emailCtl.text.trim().isEmpty;
+      emailWrong = !emailEmpty &&
+          !RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(emailCtl.text.trim());
+      passEmpty = passCtl.text.trim().isEmpty;
+      passShort = !passEmpty && passCtl.text.trim().length < 6;
+      roleError = roleVal == null;
+    });
 
-    if (roleVal == null) {
-      _showPopup(
-        icon: Icons.warning_rounded,
-        iconColor: Colors.red,
-        text: "Pilih role dulu",
-      );
+    if (nameEmpty ||
+        emailEmpty ||
+        emailWrong ||
+        passEmpty ||
+        passShort ||
+        roleError) {
       return;
     }
 
@@ -50,8 +64,6 @@ class _AddUserDialogState extends State<AddUserDialog> {
       'username': nameCtl.text.trim(),
       'role': roleVal ?? 'kasir',
     };
-
-    debugPrint('[AddUserDialog] Payload user baru: $payload');
 
     try {
       final response = await SupabaseService.client.functions.invoke(
@@ -68,8 +80,6 @@ class _AddUserDialogState extends State<AddUserDialog> {
         }
       }
 
-      debugPrint('[AddUserDialog] Response decoded: $data');
-
       if (data.containsKey("error")) {
         _showPopup(
           icon: Icons.warning_rounded,
@@ -77,7 +87,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
           text: data["error"].toString(),
         );
       } else {
-        if (mounted) Navigator.of(context).pop(); // tutup form
+        if (mounted) Navigator.of(context).pop();
 
         _showPopup(
           icon: Icons.check_circle,
@@ -91,8 +101,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
         iconColor: Colors.red,
         text: "Koneksi lambat, coba lagi.",
       );
-    } catch (e, st) {
-      debugPrint('[AddUserDialog] Exception: $e\n$st');
+    } catch (e) {
       _showPopup(
         icon: Icons.warning_rounded,
         iconColor: Colors.red,
@@ -103,9 +112,6 @@ class _AddUserDialogState extends State<AddUserDialog> {
     }
   }
 
-  // ----------------------------------------------------
-  // ✨ POPUP BARU (CLOSE DI ROW, CENTER SEMPURNA)
-  // ----------------------------------------------------
   void _showPopup({
     required IconData icon,
     required Color iconColor,
@@ -127,7 +133,6 @@ class _AddUserDialogState extends State<AddUserDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Close button (tidak merusak center)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -139,13 +144,8 @@ class _AddUserDialogState extends State<AddUserDialog> {
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 4),
-
                 Icon(icon, size: 100, color: iconColor),
-
                 const SizedBox(height: 24),
-
                 Text(
                   text,
                   textAlign: TextAlign.center,
@@ -155,7 +155,6 @@ class _AddUserDialogState extends State<AddUserDialog> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 12),
               ],
             ),
@@ -165,35 +164,79 @@ class _AddUserDialogState extends State<AddUserDialog> {
     );
   }
 
-  InputDecoration field() {
-    return InputDecoration(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      isDense: true,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-      enabledBorder: OutlineInputBorder(
+  Widget _fieldWrapper({
+    required TextEditingController c,
+    required bool error,
+    required String hint,
+    bool obscure = false,
+    TextInputType? keyboardType,
+  }) {
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: error ? Colors.red : borderColor,
+          width: 1.3,
+        ),
         borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: borderColor, width: 1),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: borderColor, width: 2),
+      child: Center(
+        child: TextField(
+          controller: c,
+          obscureText: obscure,
+          keyboardType: keyboardType,
+          style: const TextStyle(fontSize: 13),
+          onChanged: (_) {
+            setState(() {
+              if (c == nameCtl) nameEmpty = false;
+              if (c == emailCtl) {
+                emailEmpty = false;
+                emailWrong = false;
+              }
+              if (c == passCtl) {
+                passEmpty = false;
+                passShort = false;
+              }
+            });
+          },
+          decoration: InputDecoration(
+            isDense: true,
+            border: InputBorder.none,
+            hintText: hint,
+            hintStyle: const TextStyle(fontSize: 12),
+          ),
+        ),
       ),
-      filled: true,
-      fillColor: Colors.white,
     );
   }
+
+  Widget _errorText(String t) => Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            t,
+            textAlign: TextAlign.left,
+            style: const TextStyle(color: Colors.red, fontSize: 11),
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 30, vertical: 80),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: borderColor, width: 2),
       ),
       backgroundColor: Colors.white,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 340),
+        constraints: const BoxConstraints(
+          minWidth: 340,
+          maxWidth: 400,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Stack(
@@ -208,140 +251,132 @@ class _AddUserDialogState extends State<AddUserDialog> {
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
-              Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2),
-                      child: Text(
-                        "Tambah Pengguna",
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Tambah Pengguna",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  _fieldLabel("Nama Lengkap:"),
+                  _fieldWrapper(
+                    c: nameCtl,
+                    error: nameEmpty,
+                    hint: "Masukkan nama...",
+                  ),
+                  if (nameEmpty) _errorText("Nama wajib diisi"),
+
+                  const SizedBox(height: 10),
+                  _fieldLabel("Email:"),
+                  _fieldWrapper(
+                    c: emailCtl,
+                    error: emailEmpty || emailWrong,
+                    hint: "Masukkan email...",
+                  ),
+                  if (emailEmpty)
+                    _errorText("Email wajib diisi")
+                  else if (emailWrong)
+                    _errorText("Format email salah"),
+
+                  const SizedBox(height: 10),
+                  _fieldLabel("Password:"),
+                  _fieldWrapper(
+                    c: passCtl,
+                    error: passEmpty || passShort,
+                    obscure: true,
+                    hint: "Minimal 6 karakter",
+                  ),
+                  if (passEmpty)
+                    _errorText("Password wajib diisi")
+                  else if (passShort)
+                    _errorText("Minimal 6 karakter"),
+
+                  const SizedBox(height: 10),
+                  _fieldLabel("Role:"),
+                  Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                          color: roleError ? Colors.red : borderColor,
+                          width: 1.3),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: roleVal,
+                        items: const [
+                          DropdownMenuItem(
+                              value: "admin", child: Text("Admin")),
+                          DropdownMenuItem(
+                              value: "kasir", child: Text("Kasir")),
+                        ],
+                        onChanged: (v) {
+                          setState(() {
+                            roleVal = v;
+                            roleError = false;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  if (roleError) _errorText("Pilih role"),
+
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 43,
+                    child: ElevatedButton(
+                      onPressed: loading ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: saveColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: borderColor, width: 1.5),
+                        ),
+                      ),
+                      child: loading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "Simpan",
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 43,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black,
+                        side: BorderSide(color: borderColor, width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "Batal",
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 17,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
-
-                    _fieldLabel("Nama Lengkap:"),
-                    const SizedBox(height: 3),
-                    SizedBox(
-                      height: 36,
-                      child: TextFormField(
-                        controller: nameCtl,
-                        decoration: field(),
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? "Wajib diisi" : null,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-                    _fieldLabel("Email:"),
-                    const SizedBox(height: 3),
-                    SizedBox(
-                      height: 36,
-                      child: TextFormField(
-                        controller: emailCtl,
-                        decoration: field(),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return "Email wajib";
-                          }
-                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) {
-                            return "Format email salah";
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-                    _fieldLabel("Password:"),
-                    const SizedBox(height: 3),
-                    SizedBox(
-                      height: 36,
-                      child: TextFormField(
-                        controller: passCtl,
-                        obscureText: true,
-                        decoration: field(),
-                        validator: (v) =>
-                            v == null || v.trim().length < 6 ? "Min 6 karakter" : null,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-                    _fieldLabel("Role:"),
-                    const SizedBox(height: 3),
-                    SizedBox(
-                      height: 36,
-                      child: DropdownButtonFormField<String>(
-                        decoration: field(),
-                        dropdownColor: Colors.white,
-                        value: roleVal,
-                        icon: const Icon(Icons.arrow_drop_down),
-                        style: const TextStyle(fontSize: 14, color: Colors.black),
-                        items: const [
-                          DropdownMenuItem(value: "admin", child: Text("Admin")),
-                          DropdownMenuItem(value: "kasir", child: Text("Kasir")),
-                        ],
-                        onChanged: (v) => setState(() => roleVal = v),
-                        validator: (v) => v == null ? "Pilih role" : null,
-                      ),
-                    ),
-
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 43,
-                      child: ElevatedButton(
-                        onPressed: loading ? null : _submit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: saveColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: borderColor, width: 1.5),
-                          ),
-                        ),
-                        child: loading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text(
-                                "Simpan",
-                                style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white),
-                              ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 43,
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          side: BorderSide(color: borderColor, width: 1.5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          "Batal",
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -354,7 +389,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
       alignment: Alignment.centerLeft,
       child: Text(
         text,
-        style: const TextStyle(fontWeight: FontWeight.bold),
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
       ),
     );
   }

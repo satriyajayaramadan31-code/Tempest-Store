@@ -8,12 +8,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 const Color _borderColor = Color(0xFF3A71A4);
 const Color _pillBg = Color(0xFF91C4D9);
 
-/// Cara panggil:
-/// showAddProductDialog(
-///   context,
-///   categories: {'Minuman': 1, 'Kue': 2, 'Snack': 3},
-///   onSubmit: (data) async { ... }
-/// );
 Future<void> showAddProductDialog(
   BuildContext context, {
   required Map<String, int> categories,
@@ -52,6 +46,16 @@ class _AddProductDialogState extends State<_AddProductDialog> {
   String? selectedCategory;
   Uint8List? selectedImageBytes;
   String? selectedImageName;
+
+  bool nameError = false;
+  bool skuError = false;
+  bool categoryError = false;
+
+  bool priceEmptyError = false;
+  bool priceFormatError = false;
+
+  bool minStockEmptyError = false;
+  bool minStockFormatError = false;
 
   @override
   void dispose() {
@@ -101,36 +105,78 @@ class _AddProductDialogState extends State<_AddProductDialog> {
                 ],
               ),
               const SizedBox(height: 18),
+
               _labelText('Nama Produk:'),
               const SizedBox(height: 6),
-              _buildTextField(nameController, 'Masukkan nama produk...'),
+              _buildTextField(
+                nameController,
+                'Masukkan nama produk...',
+                error: nameError,
+              ),
+              if (nameError) _errorText("Kolom nama produk harus diisi"),
               const SizedBox(height: 12),
+
               _labelText('SKU:'),
               const SizedBox(height: 6),
-              _buildTextField(skuController, 'Masukkan SKU...'),
+              _buildTextField(
+                skuController,
+                'Masukkan SKU...',
+                error: skuError,
+              ),
+              if (skuError) _errorText("Kolom SKU harus diisi"),
               const SizedBox(height: 12),
+
               _labelText('Kategori:'),
               const SizedBox(height: 6),
               _buildCategoryDropdown(),
+              if (categoryError) _errorText("Kategori harus dipilih"),
               const SizedBox(height: 12),
+
               _labelText('Harga:'),
               const SizedBox(height: 6),
-              _buildTextField(priceController, 'Masukkan harga',
-                  keyboardType: TextInputType.number),
+              _buildTextField(
+                priceController,
+                'Masukkan harga',
+                keyboardType: TextInputType.number,
+                error: priceEmptyError || priceFormatError,
+              ),
+              if (priceEmptyError) _errorText("Kolom harga harus diisi")
+              else if (priceFormatError) _errorText("Harga harus berupa angka"),
               const SizedBox(height: 12),
+
               _labelText('Batas Stok Minimum:'),
               const SizedBox(height: 6),
-              _buildTextField(minStockController, 'Masukkan batas minimum',
-                  keyboardType: TextInputType.number),
+              _buildTextField(
+                minStockController,
+                'Masukkan batas minimum',
+                keyboardType: TextInputType.number,
+                error: minStockEmptyError || minStockFormatError,
+              ),
+              if (minStockEmptyError)
+                _errorText("Kolom stok minimum harus diisi")
+              else if (minStockFormatError)
+                _errorText("Stok minimum harus berupa angka"),
               const SizedBox(height: 12),
+
               _labelText('Foto Produk:'),
               const SizedBox(height: 6),
               _buildImagePicker(),
               const SizedBox(height: 18),
+
               _buildSubmitButton(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _errorText(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Text(
+        text,
+        style: const TextStyle(color: Colors.red, fontSize: 11),
       ),
     );
   }
@@ -142,15 +188,21 @@ class _AddProductDialogState extends State<_AddProductDialog> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hintText,
-      {TextInputType? keyboardType}) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String hintText, {
+    TextInputType? keyboardType,
+    required bool error,
+  }) {
     return Container(
-      height: 20,
       padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: _borderColor),
+        border: Border.all(
+          color: error ? Colors.red : _borderColor,
+          width: 1.5,
+        ),
       ),
       child: TextField(
         controller: controller,
@@ -159,8 +211,8 @@ class _AddProductDialogState extends State<_AddProductDialog> {
         decoration: InputDecoration(
           border: InputBorder.none,
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 0),
           hintText: hintText,
+          contentPadding: const EdgeInsets.symmetric(vertical: 6),
         ),
       ),
     );
@@ -173,34 +225,30 @@ class _AddProductDialogState extends State<_AddProductDialog> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: _borderColor),
+        border: Border.all(
+          color: categoryError ? Colors.red : _borderColor,
+          width: 1.5,
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton2<String>(
           isExpanded: true,
-          hint: const Text(
-            'Pilih Kategori...',
-            style: TextStyle(fontSize: 12),
+          buttonStyleData: const ButtonStyleData(
+            padding: EdgeInsets.zero,
+            height: 20,
           ),
+          menuItemStyleData: const MenuItemStyleData(height: 28),
+          hint: const Text('Pilih Kategori...', style: TextStyle(fontSize: 11)),
           value: selectedCategory,
           items: widget.categories.keys
-              .map((e) => DropdownMenuItem<String>(
-                    value: e,
-                    child: Text(
-                      e,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ))
+              .map(
+                (e) => DropdownMenuItem<String>(
+                  value: e,
+                  child: Text(e, style: const TextStyle(fontSize: 11)),
+                ),
+              )
               .toList(),
           onChanged: (v) => setState(() => selectedCategory = v),
-          dropdownStyleData: DropdownStyleData(
-            maxHeight: 150,
-            decoration: BoxDecoration(
-              border: Border.all(color: _borderColor),
-              borderRadius: BorderRadius.circular(6),
-              color: Colors.white,
-            ),
-          ),
         ),
       ),
     );
@@ -221,7 +269,6 @@ class _AddProductDialogState extends State<_AddProductDialog> {
           borderRadius: BorderRadius.circular(28),
           side: const BorderSide(color: _borderColor, width: 2),
         ),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       ),
     );
   }
@@ -271,40 +318,55 @@ class _AddProductDialogState extends State<_AddProductDialog> {
   }
 
   Future<void> _onAddProductPressed() async {
-    if (nameController.text.trim().isEmpty ||
-        skuController.text.trim().isEmpty ||
-        selectedCategory == null ||
-        priceController.text.trim().isEmpty ||
-        minStockController.text.trim().isEmpty) {
-      await _showPopup(
-        icon: Icons.warning_rounded,
-        iconColor: Colors.red,
-        text: "Lengkapi semua field",
-      );
+    setState(() {
+      nameError = nameController.text.trim().isEmpty;
+      skuError = skuController.text.trim().isEmpty;
+      categoryError = selectedCategory == null;
+
+      priceEmptyError = priceController.text.trim().isEmpty;
+      priceFormatError =
+          !priceEmptyError && double.tryParse(priceController.text.trim()) == null;
+
+      minStockEmptyError = minStockController.text.trim().isEmpty;
+      minStockFormatError = !minStockEmptyError &&
+          int.tryParse(minStockController.text.trim()) == null;
+    });
+
+    if (nameError ||
+        skuError ||
+        categoryError ||
+        priceEmptyError ||
+        priceFormatError ||
+        minStockEmptyError ||
+        minStockFormatError) {
       return;
     }
+
+    final harga = double.parse(priceController.text);
+    final minimum = int.parse(minStockController.text);
 
     Map<String, dynamic> data = {
       "namaproduk": nameController.text.trim(),
       "SKU": skuController.text.trim(),
       "kategori": widget.categories[selectedCategory],
-      "harga": double.tryParse(priceController.text.trim()) ?? 0,
-      "minimum": int.tryParse(minStockController.text.trim()) ?? 0,
+      "harga": harga,
+      "minimum": minimum,
     };
 
     try {
       if (selectedImageBytes != null && selectedImageName != null) {
-        final fileExt = selectedImageName!.split('.').last;
-        final fileName = '${data["SKU"]}.$fileExt';
+        final ext = selectedImageName!.split('.').last;
+        final fileName = '${data["SKU"]}.$ext';
 
-        await Supabase.instance.client
-            .storage
+        await Supabase.instance.client.storage
             .from('produk_image')
-            .uploadBinary(fileName, selectedImageBytes!,
-                fileOptions: FileOptions(upsert: true));
+            .uploadBinary(
+              fileName,
+              selectedImageBytes!,
+              fileOptions: FileOptions(upsert: true),
+            );
 
-        final publicUrl = Supabase.instance.client
-            .storage
+        final publicUrl = Supabase.instance.client.storage
             .from('produk_image')
             .getPublicUrl(fileName);
 
@@ -316,20 +378,27 @@ class _AddProductDialogState extends State<_AddProductDialog> {
       if (!mounted) return;
       Navigator.of(context).pop();
 
-      await _showPopup(
-        icon: Icons.check_circle,
-        iconColor: Colors.green,
-        text: "Produk Berhasil \nDitambahkan",
-      );
+      await _showSuccess("Produk Berhasil \nDitambahkan");
     } catch (e) {
       if (!mounted) return;
-      await _showPopup(
-        icon: Icons.warning_rounded,
-        iconColor: Colors.red,
-        text: "Terjadi kesalahan: $e",
-      );
-      debugPrint(e.toString());
+      await _showError("Terjadi kesalahan: $e");
     }
+  }
+
+  Future<void> _showError(String text) {
+    return _showPopup(
+      icon: Icons.warning_rounded,
+      iconColor: Colors.red,
+      text: text,
+    );
+  }
+
+  Future<void> _showSuccess(String text) {
+    return _showPopup(
+      icon: Icons.check_circle,
+      iconColor: Colors.green,
+      text: text,
+    );
   }
 
   Future<void> _showPopup({
